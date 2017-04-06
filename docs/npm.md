@@ -101,6 +101,8 @@ npm repo <package> -- goes to github page for package
 
 --save -- will always add ~
 
+npm install --save-dev @types/mocha -- install type defs to get intellisense in webstorm
+npm install @types/node --save-dev -- node typings
 
 
 
