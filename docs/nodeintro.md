@@ -71,253 +71,279 @@ node --version
 
 **Node REPL**
 
+**NODE EVENT LOOP**
 
-> **Note:**
+Node's "event loop" is central to being able to handle high throughput scenarios. It is a magical place filled with unicorns and rainbows, and is the reason Node can essentially be "single threaded" while still allowing an arbitrary number of operations to be handled in the background. This post will shed light on how the event loop operates so you too can enjoy the magic.
 
-> - StackEdit is accessible offline after the application has been loaded for the first time.
-> - Your local documents are not shared between different browsers or computers.
-> - Clearing your browser's data may **delete all your local documents!** Make sure your documents are synchronized with **Google Drive** or **Dropbox** (check out the [<i class="icon-refresh"></i> Synchronization](#synchronization) section).
 
-#### <i class="icon-file"></i> Create a document
 
-The document panel is accessible using the <i class="icon-folder-open"></i> button in the navigation bar. You can create a new document by clicking <i class="icon-file"></i> **New document** in the document panel.
+The 'fs' module mostly uses the error back callback style. It would technically be possible to emit additional events for some calls, such as fs.readFile(), but the API was made to only alert the user if the desired operation succeeded or if something failed. This API selection was an architecture decision and not due to technical limitations.
 
-#### <i class="icon-folder-open"></i> Switch to another document
+A common misconception is that event emitters are somehow asynchronous in nature on their own, but this is incorrect. The following is a trivial code snippet to demonstrate this.
 
-All your local documents are listed in the document panel. You can switch from one to another by clicking a document in the list or you can toggle documents using <kbd>Ctrl+[</kbd> and <kbd>Ctrl+]</kbd>.
+~~~
+`function MyEmitter() {
 
-#### <i class="icon-pencil"></i> Rename a document
+  EventEmitter.call(this);
+  
+}
 
-You can rename the current document by clicking the document title in the navigation bar.
+util.inherits(MyEmitter, EventEmitter);
 
-#### <i class="icon-trash"></i> Delete a document
+MyEmitter.prototype.doStuff = function doStuff() {
 
-You can delete the current document by clicking <i class="icon-trash"></i> **Delete document** in the document panel.
+  console.log('before')
 
-#### <i class="icon-hdd"></i> Export a document
+  emitter.emit('fire')
 
-You can save the current document to a file by clicking <i class="icon-hdd"></i> **Export to disk** from the <i class="icon-provider-stackedit"></i> menu panel.
+  console.log('after')}
 
-> **Tip:** Check out the [<i class="icon-upload"></i> Publish a document](#publish-a-document) section for a description of the different output formats.
+};
 
+var me = new MyEmitter();
 
-----------
+me.on('fire', function() {
 
+  console.log('emit fired');
 
-Synchronization
--------------------
+});
 
-StackEdit can be combined with <i class="icon-provider-gdrive"></i> **Google Drive** and <i class="icon-provider-dropbox"></i> **Dropbox** to have your documents saved in the *Cloud*. The synchronization mechanism takes care of uploading your modifications or downloading the latest version of your documents.
 
-> **Note:**
+me.doStuff();
 
-> - Full access to **Google Drive** or **Dropbox** is required to be able to import any document in StackEdit. Permission restrictions can be configured in the settings.
-> - Imported documents are downloaded in your browser and are not transmitted to a server.
-> - If you experience problems saving your documents on Google Drive, check and optionally disable browser extensions, such as Disconnect.
+// Output:
 
-#### <i class="icon-refresh"></i> Open a document
+// before
 
-You can open a document from <i class="icon-provider-gdrive"></i> **Google Drive** or the <i class="icon-provider-dropbox"></i> **Dropbox** by opening the <i class="icon-refresh"></i> **Synchronize** sub-menu and by clicking **Open from...**. Once opened, any modification in your document will be automatically synchronized with the file in your **Google Drive** / **Dropbox** account.
+// emit fired
 
-#### <i class="icon-refresh"></i> Save a document
+// after
+~~~
 
-You can save any document by opening the <i class="icon-refresh"></i> **Synchronize** sub-menu and by clicking **Save on...**. Even if your document is already synchronized with **Google Drive** or **Dropbox**, you can export it to a another location. StackEdit can synchronize one document with multiple locations and accounts.
 
-#### <i class="icon-refresh"></i> Synchronize a document
+EventEmitter often appears asynchronous because it is regularly used to signal the completion of asynchronous operations, but the EventEmitter API is entirely synchronous. The emit function may be called asynchronously, but note that all the listener functions will be executed synchronously, in the order they were added, before any execution can continue in statements following the call to emit.
 
-Once your document is linked to a <i class="icon-provider-gdrive"></i> **Google Drive** or a <i class="icon-provider-dropbox"></i> **Dropbox** file, StackEdit will periodically (every 3 minutes) synchronize it by downloading/uploading any modification. A merge will be performed if necessary and conflicts will be detected.
+Node itself depends on multiple libraries. One of those is libuv, the magical library that handles the queueing and processing of asynchronous events. For the remainder of this post please keep in mind that I won't distinguish if a point made relates directly to Node or libuv.
+Node utilizes as much of what's already available from the operating system's kernel as possible. Responsibilities like making write requests, holding connections and more are therefore delegated to and handled by the system. For example, incoming connections are queued by the system until they can be handled by Node.
+You may have heard that Node has a thread pool, and might be wondering "if Node pushes all those responsibilities down why would a thread pool be needed?" It's because the kernel doesn't support doing everything asynchronously. In those cases Node has to lock a thread for the duration of the operation so it can continue executing the event loop without blocking.
 
-If you just have modified your document and you want to force the synchronization, click the <i class="icon-refresh"></i> button in the navigation bar.
 
-> **Note:** The <i class="icon-refresh"></i> button is disabled when you have no document to synchronize.
 
-#### <i class="icon-refresh"></i> Manage document synchronization
+**REQUIRE**
 
-Since one document can be synchronized with multiple locations, you can list and manage synchronized locations by clicking <i class="icon-refresh"></i> **Manage synchronization** in the <i class="icon-refresh"></i> **Synchronize** sub-menu. This will let you remove synchronization locations that are associated to your document.
+used to access modules
 
-> **Note:** If you delete the file from **Google Drive** or from **Dropbox**, the document will no longer be synchronized with that location.
+var os = require('OS'); // this module can give you info about your underlying OS
 
-----------
+module.exports is a property used to export elemements of a module
 
 
-Publication
--------------
+**Callbacks vs Events**
 
-Once you are happy with your document, you can publish it on different websites directly from StackEdit. As for now, StackEdit can publish on **Blogger**, **Dropbox**, **Gist**, **GitHub**, **Google Drive**, **Tumblr**, **WordPress** and on any SSH server.
+~~~
+var events = require('events');
 
-#### <i class="icon-upload"></i> Publish a document
+var eventCenter = new events.EventEmitter();
 
-You can publish your document by opening the <i class="icon-upload"></i> **Publish** sub-menu and by choosing a website. In the dialog box, you can choose the publication format:
+eventCenter.on('init', function() {
+    var greeting = 'Hello World!';
+    console.log('We're in the init function!);
+    eventCenter.emit('secondFunction', greeting);
+});
 
-- Markdown, to publish the Markdown text on a website that can interpret it (**GitHub** for instance),
-- HTML, to publish the document converted into HTML (on a blog for example),
-- Template, to have a full control of the output.
+eventCenter.on('secondFunction', function(greeting) {
+        console.log('We're in the second function!);
+        console.log(greeting);
+    eventCenter.emit('nextFunction');
+});
 
-> **Note:** The default template is a simple webpage wrapping your document in HTML format. You can customize it in the **Advanced** tab of the <i class="icon-cog"></i> **Settings** dialog.
+eventCenter.on('nextFunction', function {
+    /* do stuff */
+});
 
-#### <i class="icon-upload"></i> Update a publication
+eventCenter.emit('init');
 
-After publishing, StackEdit will keep your document linked to that publication which makes it easy for you to update it. Once you have modified your document and you want to update your publication, click on the <i class="icon-upload"></i> button in the navigation bar.
+~~~
 
-> **Note:** The <i class="icon-upload"></i> button is disabled when your document has not been published yet.
+The nice thing about callbacks is there's no global state there, and passing parameters to them is trivial. If you have a function download(URL, callback: (FileData)->void) then you can know that's a self-contained higher-order function which essentially lets you construct a "grab this and do that" function. 
 
-#### <i class="icon-upload"></i> Manage document publication
+~~~
+var myCallback = function(err, data) {
+  if (err) throw err; // Check for the error and throw if it exists.
+  console.log('got data: '+data); // Otherwise proceed as usual.
+};
 
-Since one document can be published on multiple locations, you can list and manage publish locations by clicking <i class="icon-upload"></i> **Manage publication** in the <i class="icon-provider-stackedit"></i> menu panel. This will let you remove publication locations that are associated to your document.
+var usingItNow = function(callback) {
+  callback(null, 'get it?'); // I dont want to throw an error, so I pass null for the error argument
+};
+If we want to simulate an error case, we can define usingItNow like this
 
-> **Note:** If the file has been removed from the website or the blog, the document will no longer be published on that location.
+var usingItNow = function(callback) {
+  var myError = new Error('My custom error!');
+  callback(myError, 'get it?'); // I send my error as the first argument.
+};
+The final usage is exactly the same as in above:
 
-----------
+usingItNow(myCallback);
+~~~
 
+The only difference in behavior would be contingent on which version of usingItNow you've defined: the one that feeds a "truthy value" (an Error object) to the callback for the first argument, or the one that feeds it null for the error argument.
 
-Markdown Extra
---------------------
+Node blocking code
+~~~
+var fs = require("fs");
 
-StackEdit supports **Markdown Extra**, which extends **Markdown** syntax with some nice features.
+var data = fs.readFileSync('input.txt');
 
-> **Tip:** You can disable any **Markdown Extra** feature in the **Extensions** tab of the <i class="icon-cog"></i> **Settings** dialog.
+console.log(data.toString());
+console.log("Program Ended");
+~~~
 
-> **Note:** You can find more information about **Markdown** syntax [here][2] and **Markdown Extra** extension [here][3].
 
+Non blocking
 
-### Tables
+~~~
+var fs = require("fs");
 
-**Markdown Extra** has a special syntax for tables:
+fs.readFile('input.txt', function (err, data) {
+   if (err) return console.error(err);
+   console.log(data.toString());
+});
 
-Item     | Value
--------- | ---
-Computer | $1600
-Phone    | $12
-Pipe     | $1
+console.log("Program Ended");
+~~~
 
-You can specify column alignment with one or two colons:
+The child process module
 
-| Item     | Value | Qty   |
-| :------- | ----: | :---: |
-| Computer | $1600 |  5    |
-| Phone    | $12   |  12   |
-| Pipe     | $1    |  234  |
+1. execFile
+What?
 
+Executes an external application, given optional arguments and callback with the buffered output after the application exits.
 
-### Definition Lists
+~~~
+Running the below code will print out the current node version.
 
-**Markdown Extra** has a special syntax for definition lists too:
+const execFile = require('child_process').execFile;
+const child = execFile('node', ['--version'], (error, stdout, stderr) => {
+    if (error) {
+        console.error('stderr', stderr);
+        throw error;
+    }
+    console.log('stdout', stdout);
+});
+~~~
 
-Term 1
-Term 2
-:   Definition A
-:   Definition B
+When?
 
-Term 3
+execFile is used when we just need to execute an application and get the output. For example, we can use execFile to run an image-processing application like ImageMagick to convert an image from PNG to JPG format and we only care if it succeeds or not. execFile should not be used when the external application produces a large amount of data and we need to consume that data in real time manner.
 
-:   Definition C
+**2. spawn**
 
-:   Definition D
+What?
 
-	> part of definition D
+The spawn method spawns an external application in a new process and returns a streaming interface for I/O.
 
+How?
 
-### Fenced code blocks
+**3 exec**
 
-GitHub's fenced code blocks are also supported with **Highlight.js** syntax highlighting:
 
-```
-// Foo
-var bar = 0;
-```
 
-> **Tip:** To use **Prettify** instead of **Highlight.js**, just configure the **Markdown Extra** extension in the <i class="icon-cog"></i> **Settings** dialog.
+~~~
+const spawn = require('child_process').spawn;
+const fs = require('fs');
+function resize(req, resp) {
+    const args = [
+        "-", // use stdin
+        "-resize", "640x", // resize width to 640
+        "-resize", "x360<", // resize height if it's smaller than 360
+        "-gravity", "center", // sets the offset to the center
+        "-crop", "640x360+0+0", // crop
+        "-" // output to stdout
+    ];
+    const streamIn = fs.createReadStream('./path/to/an/image');
+    const proc = spawn('convert', args);
+    streamIn.pipe(proc.stdin);
+    proc.stdout.pipe(resp);
+}
+~~~
 
-> **Note:** You can find more information:
+In the Node.js function above (an express.js controller function), we read an image file using a stream. Then, we use spawn method to spawn convert program (see imagemagick.org). Then, we feed ChildProcess proc with the image stream. As long as the proc object produces data, we write that data to the resp (which is a Writable stream) and users can see the image immediately without having to wait for the whole image to convert (resized).
 
-> - about **Prettify** syntax highlighting [here][5],
-> - about **Highlight.js** syntax highlighting [here][6].
 
+**When?**
 
-### Footnotes
+As spawn returns a stream based object, it’s great for handling applications that produce large amounts of data or for working with data as it reads in. As it’s stream based, all stream benefits apply as well:
 
-You can create footnotes like this[^footnote].
+Low memory footprint
 
-  [^footnote]: Here is the *text* of the **footnote**.
+Automatically handle back-pressure
 
+Lazily produce or consume data in buffered chunks.
 
-### SmartyPants
+Evented and non-blocking
 
-SmartyPants converts ASCII punctuation characters into "smart" typographic punctuation HTML entities. For example:
+Buffers allow you to work around the V8 heap memory limit
 
-|                  | ASCII                        | HTML              |
- ----------------- | ---------------------------- | ------------------
-| Single backticks | `'Isn't this fun?'`            | 'Isn't this fun?' |
-| Quotes           | `"Isn't this fun?"`            | "Isn't this fun?" |
-| Dashes           | `-- is en-dash, --- is em-dash` | -- is en-dash, --- is em-dash |
 
+***3 exec***
+~~~
 
-### Table of contents
+var child = require('child_process');
+child.exec('uptime', function (error, stdout, stderr) {
+    console.log(stdout);
+});
 
-You can insert a table of contents using the marker `[TOC]`:
+~~~
 
-[TOC]
+spawn(command, [args], [options] )
+~~~
+const exec = require('child_process').exec;
+exec('cat *.js bad_file | wc -l', (error, stdout, stderr) => {
+  if (error) {
+    console.error(`exec error: ${error}`);
+    return;
+  }
+  console.log(`stdout: ${stdout}`);
+  console.log(`stderr: ${stderr}`);
+});
 
+const execFile = require('child_process').execFile;
+const child = execFile('node', ['--version'], (error, stdout, stderr) => {
+  if (error) {
+    throw error;
+  }
+  console.log(stdout);
+});
+~~~
 
-### MathJax
+Fork
 
-You can render *LaTeX* mathematical expressions using **MathJax**, as on [math.stackexchange.com][1]:
+fork is built on spawn but designed to run node applications
+For example, if you have the following two files:
 
-The *Gamma function* satisfying $\Gamma(n) = (n-1)!\quad\forall n\in\mathbb N$ is via the Euler integral
 
-$$
-\Gamma(z) = \int_0^\infty t^{z-1}e^{-t}dt\,.
-$$
+In main.js:
+~~~
+var cp = require('child_process');
+var child = cp.fork('./worker');
 
-> **Tip:** To make sure mathematical expressions are rendered properly on your website, include **MathJax** into your template:
+child.on('message', function(m) {
+  // Receive results from child process
+  console.log('received: ' + m);
+});
 
-```
-<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
-```
+// Send child process some work
+child.send('Please up-case this string');
+In worker.js:
 
-> **Note:** You can find more information about **LaTeX** mathematical expressions [here][4].
+process.on('message', function(m) {
+  // Do work  (in this case just up-case the string
+  m = m.toUpperCase();
 
+  // Pass results back to parent process
+  process.send(m.toUpperCase(m));
+});
+~~~
 
-### UML diagrams
-
-You can also render sequence diagrams like this:
-
-```sequence
-Alice->Bob: Hello Bob, how are you?
-Note right of Bob: Bob thinks
-Bob-->Alice: I am good thanks!
-```
-
-And flow charts like this:
-
-```flow
-st=>start: Start
-e=>end
-op=>operation: My Operation
-cond=>condition: Yes or No?
-
-st->op->cond
-cond(yes)->e
-cond(no)->op
-```
-
-> **Note:** You can find more information:
-
-> - about **Sequence diagrams** syntax [here][7],
-> - about **Flow charts** syntax [here][8].
-
-### Support StackEdit
-
-[![](https://cdn.monetizejs.com/resources/button-32.png)](https://monetizejs.com/authorize?client_id=ESTHdCYOi18iLhhO&summary=true)
-
-  [^stackedit]: [StackEdit](https://stackedit.io/) is a full-featured, open-source Markdown editor based on PageDown, the Markdown library used by Stack Overflow and the other Stack Exchange sites.
-
-
-  [1]: http://math.stackexchange.com/
-  [2]: http://daringfireball.net/projects/markdown/syntax "Markdown"
-  [3]: https://github.com/jmcmanus/pagedown-extra "Pagedown Extra"
-  [4]: http://meta.math.stackexchange.com/questions/5020/mathjax-basic-tutorial-and-quick-reference
-  [5]: https://code.google.com/p/google-code-prettify/
-  [6]: http://highlightjs.org/
-  [7]: http://bramp.github.io/js-sequence-diagrams/
-  [8]: http://adrai.github.io/flowchart.js/
+Cluster

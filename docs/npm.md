@@ -1,5 +1,6 @@
+####
 **Package vs Module**
-
+####
 
 A module is a single js file with reusable functionality.
 
@@ -98,13 +99,7 @@ npm repo <package> -- goes to github page for package
 
 **sudo npm npm@lates -g -- upgrade npm**
 
-
-
 --save -- will always add ~
-
-
-
-
 
 
 
